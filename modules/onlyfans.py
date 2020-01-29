@@ -315,8 +315,12 @@ def download_media(media_set, session, directory, username, post_count, location
     def download(media, session, directory, username):
         while True:
             link = media["link"]
-            r = session.head(link)
+            r = json_request(session, link, "HEAD")
+            if not r:
+                break
 
+            header = r.headers
+            content_length = int(header["content-length"])
             date_object = datetime.strptime(
                 media["postedAt"], "%d-%m-%Y %H:%M:%S")
             og_filename = media["filename"]
@@ -326,7 +330,9 @@ def download_media(media_set, session, directory, username, post_count, location
             timestamp = date_object.timestamp()
             if not overwrite_files:
                 if os.path.isfile(download_path):
-                    return
+                    local_size = os.path.getsize(download_path)
+                    if local_size == content_length:
+                        return
             r = json_request(session, link)
             if not r:
                 break
@@ -349,7 +355,7 @@ def download_media(media_set, session, directory, username, post_count, location
         media_set, [session], [directory], [username]))
 
 
-def create_session(user_agent, auth_id, auth_hash, app_token, sess="None"):
+def create_session(user_agent, app_token, sess="None"):
     response = []
     auth_count = 1
     auth_version = "(V1)"
@@ -368,8 +374,6 @@ def create_session(user_agent, auth_id, auth_hash, app_token, sess="None"):
             session.headers = {
                 'User-Agent': user_agent, 'Referer': 'https://onlyfans.com/'}
             auth_cookies = [
-                {'name': 'auth_id', 'value': auth_id},
-                {'name': 'auth_hash', 'value': auth_hash},
                 {'name': 'sess', 'value': sess}
             ]
             for auth_cookie in auth_cookies:
@@ -400,6 +404,7 @@ def create_session(user_agent, auth_id, auth_hash, app_token, sess="None"):
             subscriber_count = r["subscriptions"]["all"]
             return [session, option_string, subscriber_count, response]
         auth_count += 1
+        break
     return [False, response]
 
 
